@@ -121,9 +121,10 @@ mod tests {
         let error = RustBackend::development_system()
             .build(temp.path(), BuildMode::Dev)
             .expect_err("invalid generated Rust should fail");
+        let message = error.to_string();
 
         assert!(
-            error.to_string().contains("error:"),
+            message.contains("dealer_backend_failure"),
             "expected Cargo/Rust error output, got:\n{}",
             error
         );
