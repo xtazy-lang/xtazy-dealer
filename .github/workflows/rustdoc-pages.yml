@@ -26,7 +26,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Generate Rustdoc
-        run: cargo doc -p xtazy-dealer --no-deps --document-private-items --locked
+        run: cargo doc -p xtazy-dealer --no-deps --document-private-items
 
       - name: Prepare Pages artifact
         run: |
