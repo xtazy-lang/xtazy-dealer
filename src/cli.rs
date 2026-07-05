@@ -12,8 +12,15 @@ pub(crate) enum CommandKind {
     },
     Install {
         package: Option<String>,
-        project: String,
     },
+    Update {
+        package: Option<String>,
+    },
+    Outdated,
+    Remove {
+        package: String,
+    },
+    CacheClean,
     Build {
         project: String,
         mode: BuildMode,
@@ -22,6 +29,9 @@ pub(crate) enum CommandKind {
         project: String,
         mode: BuildMode,
     },
+    Test {
+        project: String,
+    },
     Clean {
         project: String,
     },
@@ -29,11 +39,13 @@ pub(crate) enum CommandKind {
         kind: InitKind,
         path: Option<String>,
     },
-    Xtazy {
-        subcommand: XtazySubcommand,
+    Tooling {
+        subcommand: ToolingSubcommand,
     },
     SelfUpdate,
-    Doctor,
+    SelfAutoUpdate {
+        action: AutoUpdateAction,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,18 +61,15 @@ pub(crate) enum InitKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum XtazySubcommand {
-    Install { version: Option<String> },
+pub(crate) enum ToolingSubcommand {
     Update,
-    AutoUpdate { action: Option<AutoUpdateAction> },
-    UseVersion { version: String },
-    Active,
-    List,
-    Remove { version: String },
+    AutoUpdate { action: AutoUpdateAction },
+    Doctor,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AutoUpdateAction {
+    On,
     Off,
     Status,
 }
@@ -68,7 +77,7 @@ pub(crate) enum AutoUpdateAction {
 #[derive(Parser, Debug)]
 #[command(
     name = "dealer",
-    about = "Xtazy project orchestrator",
+    about = "xtazy project orchestrator",
     disable_version_flag = true
 )]
 struct DealerCli {
@@ -81,14 +90,19 @@ enum DealerCommand {
     Check(ProjectArg),
     Fmt(FmtArgs),
     Install(InstallArgs),
+    Update(UpdateArgs),
+    Outdated,
+    Remove(RemoveArgs),
+    Cache(CacheArgs),
     Build(BuildArgs),
     Run(BuildArgs),
+    Test(ProjectArg),
     Clean(ProjectArg),
     Init(InitArgs),
-    Xtazy(XtazyArgs),
+    #[command(name = "xtazy")]
+    Tooling(ToolingArgs),
     #[command(name = "self")]
     SelfCommand(SelfArgs),
-    Doctor,
 }
 
 #[derive(Args, Debug)]
@@ -108,7 +122,27 @@ struct FmtArgs {
 #[derive(Args, Debug)]
 struct InstallArgs {
     package: Option<String>,
-    project: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct UpdateArgs {
+    package: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct RemoveArgs {
+    package: String,
+}
+
+#[derive(Args, Debug)]
+struct CacheArgs {
+    #[command(subcommand)]
+    command: CacheSubcommand,
+}
+
+#[derive(Subcommand, Debug)]
+enum CacheSubcommand {
+    Clean,
 }
 
 #[derive(Args, Debug)]
@@ -139,40 +173,28 @@ struct InitPath {
 }
 
 #[derive(Args, Debug)]
-struct XtazyArgs {
+struct ToolingArgs {
     #[command(subcommand)]
-    command: XtazyCommand,
+    command: ToolingCommand,
 }
 
 #[derive(Subcommand, Debug)]
-enum XtazyCommand {
-    Install(VersionArg),
+enum ToolingCommand {
     Update,
+    #[command(name = "auto-update")]
     AutoUpdate(AutoUpdateArgs),
-    Use(RequiredVersionArg),
-    Active,
-    List,
-    Remove(RequiredVersionArg),
-}
-
-#[derive(Args, Debug)]
-struct VersionArg {
-    version: Option<String>,
-}
-
-#[derive(Args, Debug)]
-struct RequiredVersionArg {
-    version: String,
+    Doctor,
 }
 
 #[derive(Args, Debug)]
 struct AutoUpdateArgs {
     #[command(subcommand)]
-    action: Option<AutoUpdateCommand>,
+    action: AutoUpdateCommand,
 }
 
 #[derive(Subcommand, Debug)]
 enum AutoUpdateCommand {
+    On,
     Off,
     Status,
 }
@@ -186,6 +208,8 @@ struct SelfArgs {
 #[derive(Subcommand, Debug)]
 enum SelfCommand {
     Update,
+    #[command(name = "auto-update")]
+    AutoUpdate(AutoUpdateArgs),
 }
 
 pub(crate) fn parse_args(args: &[String]) -> Result<CommandKind, String> {
@@ -216,13 +240,17 @@ fn is_known_command(value: &str) -> bool {
         "check"
             | "fmt"
             | "install"
+            | "update"
+            | "outdated"
+            | "remove"
+            | "cache"
             | "build"
             | "run"
+            | "test"
             | "clean"
             | "init"
             | "xtazy"
             | "self"
-            | "doctor"
     )
 }
 
@@ -235,7 +263,19 @@ fn command_from_cli(command: DealerCommand) -> CommandKind {
             project: args.project,
             check: args.check,
         },
-        DealerCommand::Install(args) => install_command(args),
+        DealerCommand::Install(args) => CommandKind::Install {
+            package: args.package,
+        },
+        DealerCommand::Update(args) => CommandKind::Update {
+            package: args.package,
+        },
+        DealerCommand::Outdated => CommandKind::Outdated,
+        DealerCommand::Remove(args) => CommandKind::Remove {
+            package: args.package,
+        },
+        DealerCommand::Cache(args) => match args.command {
+            CacheSubcommand::Clean => CommandKind::CacheClean,
+        },
         DealerCommand::Build(args) => CommandKind::Build {
             project: args.project,
             mode: mode_from_args(args.dev, args.prod),
@@ -244,40 +284,23 @@ fn command_from_cli(command: DealerCommand) -> CommandKind {
             project: args.project,
             mode: mode_from_args(args.dev, args.prod),
         },
+        DealerCommand::Test(args) => CommandKind::Test {
+            project: args.project,
+        },
         DealerCommand::Clean(args) => CommandKind::Clean {
             project: args.project,
         },
         DealerCommand::Init(args) => init_command(args.kind),
-        DealerCommand::Xtazy(args) => CommandKind::Xtazy {
-            subcommand: xtazy_command(args.command),
+        DealerCommand::Tooling(args) => CommandKind::Tooling {
+            subcommand: tooling_command(args.command),
         },
         DealerCommand::SelfCommand(args) => match args.command {
             SelfCommand::Update => CommandKind::SelfUpdate,
+            SelfCommand::AutoUpdate(args) => CommandKind::SelfAutoUpdate {
+                action: auto_update_action(args.action),
+            },
         },
-        DealerCommand::Doctor => CommandKind::Doctor,
     }
-}
-
-fn install_command(args: InstallArgs) -> CommandKind {
-    match (args.package, args.project) {
-        (None, None) => CommandKind::Install {
-            package: None,
-            project: ".".to_string(),
-        },
-        (Some(package), None) if looks_like_project_path(&package) => CommandKind::Install {
-            package: None,
-            project: package,
-        },
-        (Some(package), None) => CommandKind::Install {
-            package: Some(package),
-            project: ".".to_string(),
-        },
-        (package, Some(project)) => CommandKind::Install { package, project },
-    }
-}
-
-fn looks_like_project_path(value: &str) -> bool {
-    value == "." || value.contains('/') || std::path::Path::new(value).is_dir()
 }
 
 fn mode_from_args(_dev: bool, prod: bool) -> BuildMode {
@@ -301,26 +324,21 @@ fn init_command(command: InitCommand) -> CommandKind {
     }
 }
 
-fn xtazy_command(command: XtazyCommand) -> XtazySubcommand {
+fn tooling_command(command: ToolingCommand) -> ToolingSubcommand {
     match command {
-        XtazyCommand::Install(args) => XtazySubcommand::Install {
-            version: args.version,
+        ToolingCommand::Update => ToolingSubcommand::Update,
+        ToolingCommand::AutoUpdate(args) => ToolingSubcommand::AutoUpdate {
+            action: auto_update_action(args.action),
         },
-        XtazyCommand::Update => XtazySubcommand::Update,
-        XtazyCommand::AutoUpdate(args) => XtazySubcommand::AutoUpdate {
-            action: args.action.map(|action| match action {
-                AutoUpdateCommand::Off => AutoUpdateAction::Off,
-                AutoUpdateCommand::Status => AutoUpdateAction::Status,
-            }),
-        },
-        XtazyCommand::Use(args) => XtazySubcommand::UseVersion {
-            version: args.version,
-        },
-        XtazyCommand::Active => XtazySubcommand::Active,
-        XtazyCommand::List => XtazySubcommand::List,
-        XtazyCommand::Remove(args) => XtazySubcommand::Remove {
-            version: args.version,
-        },
+        ToolingCommand::Doctor => ToolingSubcommand::Doctor,
+    }
+}
+
+fn auto_update_action(command: AutoUpdateCommand) -> AutoUpdateAction {
+    match command {
+        AutoUpdateCommand::On => AutoUpdateAction::On,
+        AutoUpdateCommand::Off => AutoUpdateAction::Off,
+        AutoUpdateCommand::Status => AutoUpdateAction::Status,
     }
 }
 
@@ -379,15 +397,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_install_package_and_project() {
-        let cmd = parse_args(&args(&["dealer", "install", "foo", "project"]))
-            .expect("install command should parse");
+    fn parse_install_package() {
+        let cmd =
+            parse_args(&args(&["dealer", "install", "foo"])).expect("install command should parse");
 
         assert_eq!(
             cmd,
             CommandKind::Install {
                 package: Some("foo".to_string()),
-                project: "project".to_string()
             }
         );
     }
@@ -399,10 +416,23 @@ mod tests {
 
         assert_eq!(
             cmd,
-            CommandKind::Xtazy {
-                subcommand: XtazySubcommand::AutoUpdate {
-                    action: Some(AutoUpdateAction::Status)
+            CommandKind::Tooling {
+                subcommand: ToolingSubcommand::AutoUpdate {
+                    action: AutoUpdateAction::Status
                 }
+            }
+        );
+    }
+
+    #[test]
+    fn parse_self_auto_update_on() {
+        let cmd = parse_args(&args(&["dealer", "self", "auto-update", "on"]))
+            .expect("self auto-update on should parse");
+
+        assert_eq!(
+            cmd,
+            CommandKind::SelfAutoUpdate {
+                action: AutoUpdateAction::On
             }
         );
     }

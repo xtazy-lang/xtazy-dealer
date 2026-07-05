@@ -12,8 +12,11 @@ pub(crate) enum DealerError {
     Compiler(String),
     #[error("{0}")]
     Backend(String),
-    #[error("{feature} is recognized but not implemented yet")]
-    NotImplemented { feature: String },
+    #[error("{0}")]
+    Project(String),
+    #[error("{0}")]
+    Package(String),
+
     #[error("I/O error at '{}': {source}", path.display())]
     Io { path: PathBuf, source: io::Error },
 }

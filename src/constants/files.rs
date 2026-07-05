@@ -1,0 +1,11 @@
+pub(crate) const TARGETS_TSV: &str = "targets.tsv";
+pub(crate) const TARGETS_TSV_XSIGFILE: &str = "targets.tsv.xsigfile";
+pub(crate) const XTAZY_PARTS: &str = "xtazy.parts";
+pub(crate) const XTAZY_PARTS_XSIGFILE: &str = "xtazy.parts.xsigfile";
+pub(crate) const TAR_GZ_SUFFIX: &str = ".tar.gz";
+pub(crate) const LAST_BUILD_FILE: &str = "last-build.txt";
+pub(crate) const LATEST_XTAZY_VERSION: &str = "latest-xtazy-version";
+pub(crate) const SELF_AUTO_UPDATE: &str = "self-auto-update";
+pub(crate) const XTAZY_AUTO_UPDATE: &str = "xtazy-auto-update";
+pub(crate) const LAST_SELF_UPDATE_CHECK: &str = "last-self-update-check";
+pub(crate) const LAST_XTAZY_UPDATE_CHECK: &str = "last-xtazy-update-check";

@@ -11,168 +11,26 @@ It is responsible for the everyday project workflow:
 - run app projects
 - keep generated build files out of the source tree
 - place final user-facing output in `product/`
-- manage the selected xtazy toolchain behind the scenes
+- manage xtazy build components and updates behind the scenes
 
 Generated Rust API docs: [docs.dealer.xtazy.dev](https://docs.dealer.xtazy.dev)
 
-## Basic Usage
+## Documentation
 
-Create a new app:
+Start here:
 
-```text
-dealer init app [path]
-```
+| Page | What it covers |
+|------|----------------|
+| [Commands](docs/commands.md) | User-facing `dealer` commands for projects, packages, cache, self-update, and xtazy tooling. |
+| [Projects](docs/project.md) | Project layout, root declarations, project name/version, and the root `dealer` block. |
+| [Project Dependencies](docs/project-dependencies.md) | Dependency declaration forms, local/git/registry resolution, and resolver output. |
+| [Project Build Flow](docs/project-build-flow.md) | Check/build/run flow, πko handoff, generated Rust, Rust backend, and `product/`. |
+| [Install And Update](docs/install-and-update.md) | Installer flow, update checks, auto-update behavior, warnings, and failure rules. |
+| [Toolchain](docs/toolchain.md) | Local dealer state, independent xtazy components, Rust backend separation, and cache layout. |
+| [xtazy Parts](docs/xtazy-parts.md) | The signed `xtazy.parts` release composition format used by `dealer xtazy update`. |
+| [dealer Release](docs/release-dealer.md) | Dealer release workflow, artifacts, `targets.tsv`, signing, and publishing. |
 
-Create a new package:
-
-```text
-dealer init package [path]
-```
-
-Check and build a project:
-
-```text
-dealer check [project]
-dealer build [project]
-```
-
-Run an app project:
-
-```text
-dealer run [project]
-```
-
-Build profiles:
-
-```text
-dealer build --dev [project]
-dealer build --prod [project]
-dealer run --dev [project]
-dealer run --prod [project]
-```
-
-Clean generated state:
-
-```text
-dealer clean [project]
-```
-
-## Project Layout
-
-An xtazy project is a folder with exactly one root file:
-
-```text
-app.x
-package.x
-```
-
-`app.x` is the root of an executable app.
-
-`package.x` is the root of a reusable package.
-
-During a build, `dealer` keeps generated and final files separated:
-
-```text
-project/
-│
-├── app.x | package.x
-│   └── project root file
-│
-├── .dealer/
-│   ├── rust/
-│   │   └── generated Rust project
-│   │
-│   ├── metadata/
-│   │   └── build snapshots, selected toolchain, output path
-│   │
-│   └── logs/
-│       └── workflow logs
-│
-└── product/
-    └── final user-facing output
-```
-
-Meaning:
-
-- `.dealer/` is internal working state owned by `dealer`.
-- `.dealer/rust/` contains the generated Rust project used for backend compilation.
-- `.dealer/metadata/` stores small build snapshots such as the selected toolchain and output path.
-- `.dealer/logs/` is reserved for workflow logs.
-- `product/` contains the final output the user should run, ship, or inspect.
-
-xtazy source files stay clean; generated Rust lives in `.dealer/rust/`.
-
-## Toolchains
-
-xtazy uses Rust as its backend target, but normal xtazy projects are driven through `dealer`.
-
-The selected xtazy toolchain provides:
-
-- πko (`piko`), the xtazy compiler backend
-- `rusttime`, the Rust-facing support surface used by generated Rust
-- `std`, the future xtazy standard library surface
-
-The Rust compiler backend is tracked separately from the xtazy toolchain, so a Rust backend update does not have to be the same thing as an xtazy language/toolchain update.
-
-Local toolchain state lives under:
-
-```text
-~/.dealer/
-```
-
-Typical state includes:
-
-```text
-~/.dealer/config/active-toolchain
-~/.dealer/config/auto-update
-~/.dealer/config/active-rust-backend
-~/.dealer/xtazy/<version>/
-~/.dealer/rust/<backend>/
-```
-
-Toolchain commands:
-
-```text
-dealer xtazy active
-dealer xtazy list
-dealer xtazy use <version>
-dealer xtazy remove <version>
-dealer xtazy auto-update
-dealer xtazy auto-update off
-dealer xtazy auto-update status
-```
-
-## Command Reference
-
-```text
-dealer --version
-dealer -V
-dealer check [project]
-dealer build [--dev|--prod] [project]
-dealer run [--dev|--prod] [project]
-dealer clean [project]
-dealer init app [path]
-dealer init package [path]
-dealer doctor
-dealer xtazy active
-dealer xtazy list
-dealer xtazy use <version>
-dealer xtazy remove <version>
-dealer xtazy auto-update
-dealer xtazy auto-update off
-dealer xtazy auto-update status
-```
-
-Planned command surface:
-
-```text
-dealer fmt [--check] [project]
-dealer install [project]
-dealer install <package> [project]
-dealer xtazy install [version]
-dealer xtazy update
-dealer self update
-```
+The docs in this repository describe the intended dealer contract for the current 0.1.0 direction.
 
 ## License
 

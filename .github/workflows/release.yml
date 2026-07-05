@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.guard.outputs.version }}
+      tag: ${{ steps.guard.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: guard
+        uses: xtazy-lang/ci-cd-helpers-xtazy/.github/actions/release-guard@v0.1.0
+        with:
+          manifest: Cargo.toml
+          tag-prefix: v
+
+  test:
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --quiet
+
+  build:
+    needs: test
+    uses: xtazy-lang/ci-cd-helpers-xtazy/.github/workflows/rust-release-build.yml@v0.1.0
+    with:
+      binary-name: dealer
+      package-name: xtazy-dealer
+      artifact-prefix: dealer
+      version-source: cargo
+      package-format: tar.gz
+      result-files-file: .github/release/result_files.json
+
+  docs:
+    needs: build
+    uses: xtazy-lang/ci-cd-helpers-xtazy/.github/workflows/docs-site.yml@v0.1.0
+    with:
+      crate-name: xtazy-dealer
+      out-dir: docs-out
+      include-rust-api: "true"
+      cname: docs.dealer.xtazy.dev
+
+  publish:
+    needs:
+      - preflight
+      - build
+      - docs
+    runs-on: ubuntu-latest
+    environment: release-signing
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+      RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-results
+          path: release-assets
+
+      - name: Stage release upload directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf release-upload
+          mkdir -p release-upload
+
+          find release-assets -type f -name '*.tar.gz' -print | sort | while IFS= read -r file; do
+            cp "$file" "release-upload/$(basename "$file")"
+          done
+
+          cp release-assets/release-results/version.txt release-upload/version.txt
+          cp release-assets/release-results/targets.tsv release-upload/targets.tsv
+
+          test -s release-upload/version.txt
+          test -s release-upload/targets.tsv
+          test "$(find release-upload -type f -name '*.tar.gz' | wc -l)" -gt 0
+
+      - uses: xtazy-lang/ci-cd-helpers-xtazy/.github/actions/sign-files@v0.1.0
+        env:
+          XSIG_PASSWORD: ${{ secrets.XSIG_PASSWORD }}
+        with:
+          files: release-upload/targets.tsv
+          private: .release-signing/xtazy_dealer.private
+          delegation: .release-signing/xtazy_dealer.xsig
+          xsig-version: v0.1.0
+
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create "$RELEASE_TAG" release-upload/* \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" \
+            --notes "Release $RELEASE_TAG"

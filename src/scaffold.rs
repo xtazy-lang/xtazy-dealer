@@ -18,14 +18,11 @@ pub(crate) fn init_project(kind: InitKind, path: &Path) -> DealerResult<PathBuf>
 
     let name = project_name(path);
     let (root_file, content) = match kind {
-        InitKind::App => (
-            app,
-            format!("app {name}\n\tterminal.log\n\t\tmessage: \"Hello from Xtazy\"\n"),
-        ),
-        InitKind::Package => (package, format!("package {name}\n\tdeliver\n")),
+        InitKind::App => (app, format!("app {name} 1.0.0\n")),
+        InitKind::Package => (package, format!("package {name} 1.0.0\n")),
     };
 
-    fs::write(&root_file, content).map_err(|error| DealerError::io(&root_file, error))?;
+    fs::write(&root_file, &content).map_err(|error| DealerError::io(&root_file, error))?;
     Ok(root_file)
 }
 
@@ -53,7 +50,7 @@ fn sanitize_xtazy_ident(value: &str) -> String {
         }
     }
     if ident.is_empty() || ident.chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
-        format!("Xtazy{ident}")
+        format!("xtazy{ident}")
     } else {
         ident
     }
@@ -73,12 +70,46 @@ mod tests {
         assert_eq!(root, temp.path().join("app.x"));
         assert!(temp.path().join("app.x").is_file());
         assert!(!temp.path().join("package.x").exists());
+
+        // Check exact content
+        let content = fs::read_to_string(&root).unwrap();
+        let expected_name = project_name(temp.path());
+        assert_eq!(content, format!("app {expected_name} 1.0.0\n"));
+
+        // Verify parseability
+        let decl = crate::project::dealer_block::parse_project_file(&content).unwrap();
+        assert!(decl.is_app);
+        assert_eq!(decl.name, expected_name);
+        assert_eq!(decl.version, "1.0.0");
+    }
+
+    #[test]
+    fn init_package_creates_package_root_only() {
+        let temp = TempProject::new("init-pkg");
+
+        let root = init_project(InitKind::Package, temp.path()).expect("package init should pass");
+
+        assert_eq!(root, temp.path().join("package.x"));
+        assert!(temp.path().join("package.x").is_file());
+        assert!(!temp.path().join("app.x").exists());
+
+        // Check exact content
+        let content = fs::read_to_string(&root).unwrap();
+        let expected_name = project_name(temp.path());
+        assert_eq!(content, format!("package {expected_name} 1.0.0\n"));
+
+        // Verify parseability
+        let decl = crate::project::dealer_block::parse_project_file(&content).unwrap();
+        assert!(!decl.is_app);
+        assert_eq!(decl.name, expected_name);
+        assert_eq!(decl.version, "1.0.0");
     }
 
     #[test]
     fn init_refuses_existing_root() {
         let temp = TempProject::new("init-existing");
-        fs::write(temp.path().join("app.x"), "app Existing\n").expect("app.x should be written");
+        fs::write(temp.path().join("app.x"), "app Existing 1.0.0\n")
+            .expect("app.x should be written");
 
         let error =
             init_project(InitKind::Package, temp.path()).expect_err("existing root should fail");

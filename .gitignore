@@ -1,5 +1,8 @@
-/target/
-/.DS_Store
+target/
+.DS_Store
 /.dealer/
 /product/
 /*_project/
+/release-assets/
+/release-upload/
+/*.xsig

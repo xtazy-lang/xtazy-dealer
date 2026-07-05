@@ -20,7 +20,7 @@ impl ToolSource {
 
     fn label(self) -> &'static str {
         match self {
-            Self::PinnedToolchain => "pinned Xtazy toolchain",
+            Self::PinnedToolchain => "pinned xtazy toolchain",
             Self::DevelopmentFallback => "development fallback",
         }
     }

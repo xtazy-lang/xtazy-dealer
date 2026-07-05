@@ -1,0 +1,25 @@
+name: Docs Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-pages
+  cancel-in-progress: false
+
+jobs:
+  docs:
+    uses: xtazy-lang/ci-cd-helpers-xtazy/.github/workflows/docs-site.yml@v0.1.0
+    with:
+      crate-name: xtazy-dealer
+      out-dir: docs-out
+      include-rust-api: "true"
+      cname: docs.dealer.xtazy.dev
