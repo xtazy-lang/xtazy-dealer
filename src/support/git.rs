@@ -64,7 +64,7 @@ pub(crate) fn list_remote_tags(url: &str) -> Result<Vec<String>, String> {
         .map_err(|e| e.to_string())?;
 
     let mut tags = Vec::new();
-    for reference in ref_map.remote_refs {
+    for reference in ref_map.0.remote_refs {
         let (ref_name, _, _) = reference.unpack();
         tags.push(ref_name.to_string());
     }
